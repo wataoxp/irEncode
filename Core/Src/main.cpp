@@ -101,7 +101,7 @@ uint32_t IR_HighFrequencyInit(TIM& hf,GPIO_TypeDef *GPIOx,uint32_t Pin,uint32_t 
 	uint32_t ret = 0;
 
 	TIM_Config(hf, TxIR::HighTimerPsc, TxIR::hf_Period);
-	ret += PWM_Config(hf, GPIOx, Pin, Alternate, TxIR::hfChannel, LL_TIM_OCMODE_PWM1);		//AF_8がIR_OUT
+	ret += PWM_Config(hf, GPIOx, Pin, Alternate, TxIR::hfChannel, LL_TIM_OCMODE_PWM1);
 
 	return ret;
 }
