@@ -81,7 +81,7 @@ int main(void)
 		length *= Infrared::BurstTransferLength;
 		dma.StartDMA(TxIR::txChannel, length);
 
-		Delay::mDelay(200);
+		Delay::mDelay(200);		// DMA転送完了とTIMの送信完了は一致しないため
 		dma.StopDMA(TxIR::txChannel);
 	}
 }
