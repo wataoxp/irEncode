@@ -43,7 +43,7 @@ int main(void)
 	DMA dma(DMA1);
 	irEncode TxIR(TxData);
 	uint32_t length = 0;
-	uint32_t data[4];
+	irEncodeUnits::EncodeByteData data[4];
 
 	IR_HighFrequencyInit(HF, GPIOB, Pin9, LL_GPIO_AF_0);		//IR_OUT
 	IR_LowFrequencyInit(LF, GPIOB, Pin8, LL_GPIO_AF_2);
@@ -60,19 +60,18 @@ int main(void)
 	__NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
 	__NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0);
 
-	GPIO_Config(GPIOA, Pin7, LL_GPIO_MODE_INPUT);
+	GPIO_Config(GPIOA, Pin9, LL_GPIO_MODE_INPUT);
 
 	uint32_t bit = 0;
 
 	while(1)
 	{
 		do{
-			bit = LL_GPIO_IsInputPinSet(GPIOA, 1 << Pin7);
+			bit = LL_GPIO_IsInputPinSet(GPIOA, 1 << Pin9);
 		}while(bit != 0);
 
 		data[0] = 0x01D00C30;
 		data[1] = 0x03000000;
-
 		length = TxIR.Encode(data, Infrared::FormatSymbol::AEHA,FormatAEHA::CeilingLightControlBitNum);
 
 //		data[0] = 0x806300FF;
@@ -81,7 +80,7 @@ int main(void)
 		length *= Infrared::BurstTransferLength;
 		dma.StartDMA(TxIR::txChannel, length);
 
-		Delay::mDelay(200);		// DMA転送完了とTIMの送信完了は一致しないため
+		Delay::mDelay(200);
 		dma.StopDMA(TxIR::txChannel);
 	}
 }
@@ -101,7 +100,7 @@ uint32_t IR_HighFrequencyInit(TIM& hf,GPIO_TypeDef *GPIOx,uint32_t Pin,uint32_t 
 	uint32_t ret = 0;
 
 	TIM_Config(hf, TxIR::HighTimerPsc, TxIR::hf_Period);
-	ret += PWM_Config(hf, GPIOx, Pin, Alternate, TxIR::hfChannel, LL_TIM_OCMODE_PWM1);
+	ret += PWM_Config(hf, GPIOx, Pin, Alternate, TxIR::hfChannel, LL_TIM_OCMODE_PWM1);		//AF_8がIR_OUT
 
 	return ret;
 }

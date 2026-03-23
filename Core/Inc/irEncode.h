@@ -16,6 +16,8 @@ namespace irEncodeUnits{
 		uint16_t DummyRCR;
 		uint16_t Duty;
 	}EncodePulseData;
+
+	typedef uint32_t EncodeByteData;
 }
 
 class irEncode{
@@ -27,7 +29,7 @@ private:
 	uint32_t EncodeAEHA(uint32_t*,uint32_t num);
 public:
 	irEncode(irEncodeUnits::EncodePulseData* address);
-	uint32_t Encode(uint32_t*,Infrared::FormatSymbol type,uint32_t num);
+	uint32_t Encode(irEncodeUnits::EncodeByteData*,Infrared::FormatSymbol type,uint32_t num);
 	uint32_t SetEncodeAddress(irEncodeUnits::EncodePulseData* buffer);
 	irEncodeUnits::EncodePulseData* GetEncodeAddress(void);
 };

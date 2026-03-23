@@ -46,7 +46,7 @@ uint32_t irEncode::EncodeNEC(uint32_t data,uint32_t num)
 	uint32_t bit = 0;
 	uint32_t count = 0;
 
-	uint32_t msb = LSBtoMSB(data);
+	uint32_t msb = ByteSwap(data);
 
 	EncodeSetSignal(count++, LeaderCodePeriod, LeaderCodeDuty);
 
@@ -71,7 +71,7 @@ uint32_t irEncode::EncodeAEHA(uint32_t* buf,uint32_t num)
 	uint32_t idxLimit = (num - (LeaderBit + StopBit + IdleBit)) / MinDataBit;	// データ部の数をチェック
 	uint32_t idx = 0;
 
-	uint32_t msb = LSBtoMSB(buf[idx]);
+	uint32_t msb = ByteSwap(buf[idx]);
 
 	EncodeSetSignal(count++, LeaderCodePeriod, LeaderCodeDuty);
 
@@ -83,7 +83,7 @@ uint32_t irEncode::EncodeAEHA(uint32_t* buf,uint32_t num)
 		if(bit % MinDataBit == 0)	// bitはインクリメント後に評価
 		{
 			idx = (idx < idxLimit)? idx+1:0;
-			msb = LSBtoMSB(buf[idx]);
+			msb = ByteSwap(buf[idx]);
 			bit = 0;
 		}
 	}
@@ -103,8 +103,8 @@ uint32_t irEncode::EncodeAEHA(EncodeByteData *data,uint32_t num)
 	uint32_t bit = 0;
 	uint32_t count = 0;
 
-	uint32_t msb1 = LSBtoMSB(data->data1);
-	uint32_t msb2 = LSBtoMSB(data->data2);
+	uint32_t msb1 = ByteSwap(data->data1);
+	uint32_t msb2 = ByteSwap(data->data2);
 
 	EncodeSetSignal(count++, LeaderCodePeriod, LeaderCodeDuty);
 

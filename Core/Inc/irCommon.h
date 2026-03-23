@@ -11,8 +11,7 @@
 #include "periph.h"
 
 namespace Infrared{
-	// ARR->RCR->CCR1の3つ
-	constexpr uint32_t BurstTransferLength = 3U;
+	constexpr uint32_t DecodeBufLength = 4;
 
 	enum class FormatSymbol{
 		NEC,
@@ -39,6 +38,7 @@ namespace FormatNEC{
 
 	constexpr uint32_t DataBitNum = LeaderBit + DataBit;
 	constexpr uint32_t TotalSize = DataBitNum + StopBit + IdleBit;
+//	constexpr uint32_t NecDMAlength = NecTotalSize * 3;
 
 	typedef enum{
 		LeaderCodePeriod = 13500,
@@ -80,7 +80,8 @@ namespace FormatAEHA{
 	}DecodeTiming;
 
 	constexpr uint32_t DataBitNum = LeaderBit + MinDataBit;
-	constexpr uint32_t Totalsize = DataBitNum + StopBit + IdleBit;
+//	constexpr uint32_t AehaTotalsize = AehaDataBitNum + StopBit + IdleBit;
+//	constexpr uint32_t AehaDMAlength = AehaTotalsize * 3;
 
 	typedef enum{
 		LeaderCodePeriod = 4900,
@@ -95,7 +96,7 @@ namespace FormatAEHA{
 	}EncodeTiming;
 }
 
-inline uint32_t LSBtoMSB(uint32_t Binary)
+static inline uint32_t ByteSwap(uint32_t Binary)
 {
 	uint32_t msb = 0;
 

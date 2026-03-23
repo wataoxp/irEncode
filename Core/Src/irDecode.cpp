@@ -62,7 +62,7 @@ uint32_t irDecode::DecodeNEC(const uint16_t*Address)
 		numBits++;
 	}
 
-	DecodeBuffer[0] = LSBtoMSB(DecodeBuffer[0]);
+	DecodeBuffer[0] = ByteSwap(DecodeBuffer[0]);
 
 	return 0;
 }
@@ -91,7 +91,7 @@ uint32_t irDecode::DecodeAEHA(const uint16_t*Address)
 
 	for(uint32_t i = 0;i <= idx;i++)
 	{
-		DecodeBuffer[i] = LSBtoMSB(DecodeBuffer[i]);
+		DecodeBuffer[i] = ByteSwap(DecodeBuffer[i]);
 	}
 
 	num += 1;				//AEHAデコードではリーダーコードを判定していない為+1して返す
