@@ -29,7 +29,7 @@ uint32_t irEncode::Encode(uint32_t* data,FormatSymbol type,uint32_t num)
 
 	if(type == FormatSymbol::NEC)
 	{
-		ret = EncodeNEC(data[0],num);
+		ret = EncodeNEC(data[0]);
 	}
 	else if(type == FormatSymbol::AEHA)
 	{
@@ -39,7 +39,7 @@ uint32_t irEncode::Encode(uint32_t* data,FormatSymbol type,uint32_t num)
 	return ret;
 }
 
-uint32_t irEncode::EncodeNEC(uint32_t data,uint32_t num)
+uint32_t irEncode::EncodeNEC(uint32_t data)
 {
 	using namespace FormatNEC;
 
@@ -62,6 +62,42 @@ uint32_t irEncode::EncodeNEC(uint32_t data,uint32_t num)
 	return count;
 }
 
+
+// データ数のみを受け取り、最終的な送信データ数を返す
+uint32_t irEncode::EncodeAEHA(uint32_t* buf,uint32_t DataBits)
+{
+	using namespace FormatAEHA;
+
+	uint32_t bit = 0;
+	uint32_t count = 0;		// 信号の総データ数
+	uint32_t idx = 0;
+
+	uint32_t msb = ByteSwap(buf[idx]);
+
+	EncodeSetSignal(count++, LeaderCodePeriod, LeaderCodeDuty);
+
+	// データ部を作成する
+	for(uint32_t i = 0;i < DataBits;i++)
+	{
+		EncodeBuffer[count].Period = (msb & (1 << bit++))? BitHigh:BitLow;
+		EncodeBuffer[count].Duty = BitDuty;
+
+		if(bit % DataBit == 0)	// 32ビット解析後次のデータへ
+		{
+			idx++;
+			msb = ByteSwap(buf[idx]);
+			bit = 0;
+		}
+		count++;
+	}
+
+	EncodeSetSignal(count++, StopPeriod, StopDuty);
+	EncodeSetSignal(count++, IdlePeriod, IdleDuty);
+
+	return count;
+}
+
+#if 0
 uint32_t irEncode::EncodeAEHA(uint32_t* buf,uint32_t num)
 {
 	using namespace FormatAEHA;
@@ -86,41 +122,6 @@ uint32_t irEncode::EncodeAEHA(uint32_t* buf,uint32_t num)
 			msb = ByteSwap(buf[idx]);
 			bit = 0;
 		}
-	}
-
-	EncodeSetSignal(count++, StopPeriod, StopDuty);
-	EncodeSetSignal(count++, IdlePeriod, IdleDuty);
-
-	return count;
-}
-
-#if 0
-// ループ回数の計算を含む前のもの
-uint32_t irEncode::EncodeAEHA(EncodeByteData *data,uint32_t num)
-{
-	using namespace FormatAEHA;
-
-	uint32_t bit = 0;
-	uint32_t count = 0;
-
-	uint32_t msb1 = ByteSwap(data->data1);
-	uint32_t msb2 = ByteSwap(data->data2);
-
-	EncodeSetSignal(count++, LeaderCodePeriod, LeaderCodeDuty);
-
-	for(; count < DataBitNum;count++)
-	{
-		EncodeBuffer[count].Period = (msb1 & (1 << bit++))? BitHigh:BitLow;
-		EncodeBuffer[count].Duty = BitDuty;
-	}
-
-	//次のバイトデータ解析前にリセット
-	bit = 0;
-
-	for(; count < num;count++)
-	{
-		EncodeBuffer[count].Period = (msb2 & (1 << bit++))? BitHigh:BitLow;
-		EncodeBuffer[count].Duty = BitDuty;
 	}
 
 	EncodeSetSignal(count++, StopPeriod, StopDuty);

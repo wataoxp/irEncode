@@ -63,8 +63,25 @@ public:
 	UART(USART_TypeDef *UARTPort);
 	void Config(Serial::UART_InitTypedef *init,uint32_t SysClk);
 	void TransmitData(uint8_t *buf,uint8_t size);
+	uint16_t ReceiveData(void);
+
+	void Enable();
+	void Disable();
 };
 
+inline void UART::Enable()
+{
+	LL_USART_Enable(USARTx);
+	__NOP();
+	__NOP();
+}
+
+inline void UART::Disable()
+{
+	LL_USART_Disable(USARTx);
+	__NOP();
+	__NOP();
+}
 
 
 

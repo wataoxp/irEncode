@@ -23,6 +23,8 @@ void DMA::Config(DMA_InitTypdef *pConfig,uint32_t Channel)
 	LL_DMA_SetChannelPriorityLevel(DMAx, Channel, LL_DMA_PRIORITY_HIGH);
 	LL_DMA_SetMode(DMAx, Channel, pConfig->TransferMode);			//Normal or Circular
 
+	LL_DMA_SetChannelPriorityLevel(DMAx,Channel,pConfig->Priority);
+
 	LL_DMA_SetPeriphIncMode(DMAx, Channel, pConfig->PeriphInc);
 	LL_DMA_SetMemoryIncMode(DMAx, Channel, pConfig->MemoryInc);
 
@@ -108,8 +110,8 @@ uint32_t DMA::StopDMA(uint32_t Channel)
 
 uint32_t DMA::StopDMAisChannel1(void)
 {
-//	while(LL_DMA_IsActiveFlag_TC1(DMAx) == 0);
-//	LL_DMA_ClearFlag_TC1(DMAx);
+	while(LL_DMA_IsActiveFlag_TC1(DMAx) == 0);
+	LL_DMA_ClearFlag_TC1(DMAx);
 	LL_DMA_DisableChannel(DMAx, LL_DMA_CHANNEL_1);
 
 	return LL_DMA_IsActiveFlag_TE1(DMAx);
@@ -117,8 +119,8 @@ uint32_t DMA::StopDMAisChannel1(void)
 
 uint32_t DMA::StopDMAisChannel2(void)
 {
-//	while(LL_DMA_IsActiveFlag_TC2(DMAx) == 0);
-//	LL_DMA_ClearFlag_TC2(DMAx);
+	while(LL_DMA_IsActiveFlag_TC2(DMAx) == 0);
+	LL_DMA_ClearFlag_TC2(DMAx);
 	LL_DMA_DisableChannel(DMAx, LL_DMA_CHANNEL_2);
 
 	return LL_DMA_IsActiveFlag_TE2(DMAx);

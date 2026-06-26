@@ -6,8 +6,6 @@
  */
 #include "rcc.h"
 
-static uint32_t HCLK;
-
 /* HighSpeedClock */
 
 #if defined(STM32G0)
@@ -50,7 +48,6 @@ void ConfigHighClock(RCC_InitTypedef *rcc,rccStatus src)
 
 	LL_RCC_SetAPB1Prescaler(rcc->APBdiv);
 
-	HCLK = rcc->clock;
 }
 
 #elif defined(STM32C0)
@@ -72,20 +69,5 @@ void RCC_InitC0(RCC_InitTypedef *rcc)
 	while(LL_RCC_GetSysClkSource() != rcc->SysClkSrc);
 
 	LL_RCC_SetAPB1Prescaler(rcc->APBdiv);
-
-	HCLK = rcc->clock;
 }
 #endif
-
-uint32_t SysTickInit(uint32_t Ticks)
-{
-	if(HCLK == 0)
-	{
-		return 1;
-	}
-	SysTick->LOAD = (uint32_t)((HCLK/Ticks)-1);
-	SysTick->VAL = 0;
-	SysTick->CTRL = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk;
-
-	return 0;
-}

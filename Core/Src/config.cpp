@@ -7,17 +7,24 @@
 
 #include "config.h"
 
+Config::Config(RealClock& RTCx) : rtc(RTCx)
+{
+	;
+}
 
-uint32_t WatchSetUp(RealClock& rtc,UART& uart,CoreClock source,TM1652& seg)
+uint32_t Config::WatchSetUp(UART& uart,CoreClock source,TM1652& seg)
 {
 	using namespace WatchClock;
+	using namespace SegSerial;
+
 	uint32_t ret = 0;
 
 	// TM1652通信用
-	UART_Config(uart, (source*1000*1000), SegPort, TxPin, TxAf, SegPort, RxPin, RxAf);
+	UART_Config(uart, source, GPIOx, TxPos, TxAf, GPIOx, RxPos, RxAf);
 
-	seg.Init(1,5);
-	seg.WriteDig(1,2,3,4);
+	seg.Clear();
+	seg.SetBrightness(Parameter::DefaultBrightness());
+	seg.WriteDig(0,0,0,0);
 
 	// STOP1モードを有効化
 	LL_PWR_SetPowerMode(LL_PWR_MODE_STOP1);
@@ -31,53 +38,16 @@ uint32_t WatchSetUp(RealClock& rtc,UART& uart,CoreClock source,TM1652& seg)
 	// RTC割りこみはEXTIライン19 立ち上がりエッジ固定
 	LL_EXTI_EnableIT_0_31(LL_EXTI_LINE_19);
 
-	return ret;
-}
-
-uint32_t EncoderSetUp(TIM& tim,Encoder& encode)
-{
-	using namespace WatchClock;
-	uint32_t ret = 0;
-
-	TIM_Config(tim, 0, UINT16_MAX);
-
-	// もっとも厳しいフィルタ設定
-	encode.Init(LL_TIM_CLOCKDIVISION_DIV4, LL_TIM_IC_FILTER_FDIV32_N8, LL_TIM_ENCODERMODE_X4_TI12);
-	ret = encode.PinInit(EncoderPort, ChannelA_Pin, ChannelA_Af, EncoderPort, ChannelB_Pin, ChannelB_Af);
-	tim.EnableTimer();
-
-	LL_TIM_ClearFlag_CC1(EncoderTimer);
-	LL_TIM_ClearFlag_CC2(EncoderTimer);
+	rtc.SetWakeUpTimer(Parameter::WakeUpCount());
+	rtc.SetTime(LL_RTC_TIME_FORMAT_AM_OR_24, 0, 0, 0);
 
 	return ret;
 }
 
-uint32_t ButtonSetUp(void)
-{
-	using namespace WatchClock;
-	uint32_t ret = 0;
-
-	ret += EXTI_Config(EncoderPushPort, EncoderPushPin, LL_GPIO_PULL_UP, LL_EXTI_MODE_IT, LL_EXTI_TRIGGER_FALLING);
-
-	__NVIC_EnableIRQ(EXTI4_15_IRQn);
-	__NVIC_SetPriority(EXTI4_15_IRQn, 0);
-
-	return ret;
-}
-
-void ConfigLCD(I2C& i2c,CoreClock source,SO1602& lcd)
-{
-	using namespace WatchClock;
-	I2C_Config(source, i2c, SO1602Port, SCLPin, SCLAf, SO1602Port, SDAPin, SDAAf);
-	lcd.Init<DelayMode::Standard>(source);
-	lcd.SetCusor(0, 0);
-	lcd.StringLCD("Clock", 5);
-}
-
-uint32_t ConfigDate(RealClock& rtc)
+uint32_t Config::SetDate()
 {
 	using namespace RealClockSpace;
-	ConfigParameters init;
+	DateConfig init;
 
 	init.WeekDay = LL_RTC_WEEKDAY_TUESDAY;
 	init.Month = LL_RTC_MONTH_FEBRUARY;
@@ -87,50 +57,84 @@ uint32_t ConfigDate(RealClock& rtc)
 	return rtc.SetDate(init.WeekDay, init.Month, init.Day, init.Year);
 }
 
-uint32_t ConfigAlarm(RealClock& rtc,RealClockSpace::Options alarm,RealClockSpace::Options sel)
+uint32_t Config::EncoderSetUp(TIM& tim,Encoder& encode)
 {
-	using namespace RealClockSpace;
-	ConfigParameters init;
+	using namespace WatchClock::RotaryEncoder;
+
 	uint32_t ret = 0;
 
-	init.Alarm = alarm;
-	init.SelectAlarm = sel;
+	TIM_Config(tim, 0, UINT16_MAX);
 
-	if(init.Alarm == Options::Alarm_Enable)
-	{
-		if((init.SelectAlarm == Options::ALMA) || (init.SelectAlarm == Options::ALMA_ALMB))
-		{
-			init.ALMA.Hours = 0;
-			init.ALMA.Minutes = 0;
-			init.ALMA.Seconds = 10;
+	// もっとも厳しいフィルタ設定
+	encode.Init(LL_TIM_CLOCKDIVISION_DIV4, LL_TIM_IC_FILTER_FDIV32_N8, LL_TIM_ENCODERMODE_X4_TI12);
+	ret = encode.PinInit(GPIOx, PhaseAPos, AfPhaseA, GPIOx, PhaseBPos, AfPhaseB);
 
-			init.ALMA.Day = 0;
-			init.ALMA.WeekDaySel = AlarmValue::WeekDay_Disable;
-
-			// 日付、時間、分の指定をマスク(無視)
-			init.ALMA.Mask = LL_RTC_ALMA_MASK_DATEWEEKDAY | LL_RTC_ALMA_MASK_HOURS
-					|LL_RTC_ALMA_MASK_MINUTES;
-		}
-		if((init.SelectAlarm == Options::ALMB) || (init.SelectAlarm == Options::ALMA_ALMB))
-		{
-			init.ALMB.Hours = 0;
-			init.ALMB.Minutes = 0;
-			init.ALMB.Seconds = 20;
-			init.ALMB.Day = 0;
-			init.ALMB.WeekDaySel = AlarmValue::WeekDay_Disable;
-
-			init.ALMB.Mask = LL_RTC_ALMB_MASK_DATEWEEKDAY | LL_RTC_ALMB_MASK_HOURS
-								|LL_RTC_ALMB_MASK_MINUTES;
-		}
-
-		ret = rtc.SetAlarm(&init);
-	}
+	tim.EnableTimer();
 
 	return ret;
 }
 
+uint32_t Config::ButtonSetUp(void)
+{
+	using namespace WatchClock::ExtiPin;
+	uint32_t ret = 0;
+	uint32_t Pull = LL_GPIO_PULL_UP;
+	uint32_t Mode = LL_EXTI_MODE_EVENT;
+	uint32_t Trigger = LL_EXTI_TRIGGER_FALLING;
 
+	ret += EXTI_Config(GPIOx, PushPos, Pull, Mode, Trigger);
+	ret += EXTI_Config(GPIOx, TimePos, Pull, Mode, Trigger);
+	ret += EXTI_Config(GPIOx, AlmaPos, Pull, Mode, Trigger);
+	ret += EXTI_Config(GPIOx, AlmbPos, Pull, Mode, Trigger);
+	ret += EXTI_Config(GPIOx, BrightnessPos, Pull, Mode, Trigger);
 
+	return ret;
+}
 
+// LF（変調周波数）はGPIOの設定は不要
+uint32_t Config::LowFrequencyInit(TIM& lf)
+{
+	using namespace WatchClock::SendIR::LfTimer;
 
+	TIM_Config(lf, Prescaler, Period);
+#ifdef DEBUG
+	return PWM_Config(lf, GPIOx, PinPos, Alternate, Channel, LL_TIM_OCMODE_PWM1);
+#else
+	return lf.ConfigPWM(Channel, LL_TIM_OCMODE_PWM1);
+#endif
+}
 
+uint32_t Config::HighFrequencyInit(TIM& hf)
+{
+	using namespace WatchClock::SendIR::HfTimer;
+
+	TIM_Config(hf, Prescaler, Period);
+	hf.SetCH1CompareValue(Period/Duty);
+
+	return PWM_Config(hf, GPIOx, PinPos, Alternate, Channel, LL_TIM_OCMODE_PWM1);
+}
+
+uint32_t Config::irEncodeInit(TIM_TypeDef* LfTim,TIM& lf,TIM& hf,DMA& dma,irEncode& ir)
+{
+	using namespace WatchClock::SendIR::MemoryAccess;
+	uint32_t ret = 0;
+
+	ret += HighFrequencyInit(hf);
+	ret += LowFrequencyInit(lf);
+
+	ret += lf.ConfigDMA(Channel, LL_TIM_CCDMAREQUEST_UPDATE);
+//	ret += DMA_Config(dma, Channel, LL_DMAMUX_REQ_TIM16_UP, (uint32_t*)ir.GetEncodeAddress(), (uint32_t*)&LfTim->DMAR);
+
+	LL_DMA_SetDataTransferDirection(Handle, Channel, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
+	LL_DMA_SetMemorySize(Handle, Channel, LL_DMA_MDATAALIGN_HALFWORD);
+	LL_TIM_ConfigDMABurst(WatchClock::SendIR::LfTimer::Timer, LL_TIM_DMABURST_BASEADDR_ARR, LL_TIM_DMABURST_LENGTH_3TRANSFERS);
+
+	LL_SYSCFG_SetIRModEnvelopeSignal(LL_SYSCFG_IR_MOD_TIM16);
+	LL_SYSCFG_SetIRPolarity(LL_SYSCFG_IR_POL_INVERTED);		//TIM出力とのXOR
+
+//	LL_DMA_EnableIT_TC(HandleDMA, txChannel);
+//	__NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
+//	__NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0);
+
+	return ret;
+}

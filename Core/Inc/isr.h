@@ -8,28 +8,20 @@
 #ifndef INC_ISR_H_
 #define INC_ISR_H_
 
-namespace DebouceFilter{
-	typedef enum{
-		CheckInterval = (16-1),		// 16で剰余。16msずつチェック
-		EnableCount = 1 << 7,		// Highの後に7回連続のLowで押下と判断
-		ClearCount = 0xFF,			// 8回すべてHighなら離されたと判断
-	}FileterVal;
-}
+#include "debounce.h"
 
 typedef struct{
-	volatile bool AlmaFlag;
-	volatile bool AlmbFlag;
-	volatile bool WutFlag;
-	volatile bool ExtiFlag;
-}ISR_Flags;
+	uint32_t ExtCommand;
+	uint32_t IntCommand;
+}isrFlags;
 
-const ISR_Flags* GetFlagStruct(void);
+const isrFlags& GetISRStruct(void);
 
-
-void SetExtiFlag(bool);
-void SetWutFlag(bool);
-void SetALMAFlag(bool);
-void SetALMAFlag(bool);
+void ResetExtCommand(void);
+void ResetIntCommand(void);
+void ResetWutFlag(void);
+void ResetAlmaFlag(void);
+void ResetAlmbFlag(void);
 
 extern "C" {
 

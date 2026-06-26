@@ -17,6 +17,8 @@ namespace Infrared{
 		NEC,
 		AEHA,
 	};
+
+	constexpr uint32_t BurstTransferLength = 3;
 }
 
 namespace FormatNEC{
@@ -38,7 +40,6 @@ namespace FormatNEC{
 
 	constexpr uint32_t DataBitNum = LeaderBit + DataBit;
 	constexpr uint32_t TotalSize = DataBitNum + StopBit + IdleBit;
-//	constexpr uint32_t NecDMAlength = NecTotalSize * 3;
 
 	typedef enum{
 		LeaderCodePeriod = 13500,
@@ -60,13 +61,9 @@ namespace FormatNEC{
 
 namespace FormatAEHA{
 
-	/*** 2026-03-08 シーリングライト用に決め打ちする ***/
-	// リーダー+データの総計が41ビット。ストップとアイドルで43ビット
-	constexpr uint32_t CeilingLightControlBitNum = 41;
-
 	typedef enum{
 		LeaderBit = 1,
-		MinDataBit = 32,	// AEHAは可変長なので最小値として設定
+		DataBit = 32,		// AEHAは可変長なので32ビットを1つの区切りとする
 		StopBit = 1,
 		IdleBit = 1,		// 最後の出力値を確定
 	}BufferSize;
@@ -78,10 +75,6 @@ namespace FormatAEHA{
 		LowPeriod = Turn * 2,
 		HighPeriod = Turn * 3,
 	}DecodeTiming;
-
-	constexpr uint32_t DataBitNum = LeaderBit + MinDataBit;
-//	constexpr uint32_t AehaTotalsize = AehaDataBitNum + StopBit + IdleBit;
-//	constexpr uint32_t AehaDMAlength = AehaTotalsize * 3;
 
 	typedef enum{
 		LeaderCodePeriod = 4900,
@@ -96,6 +89,27 @@ namespace FormatAEHA{
 	}EncodeTiming;
 }
 
+namespace DeviceCommands{
+
+	// ELSONIC CeilingLight
+	namespace ED505{
+		constexpr uint32_t GetLeaderCode() { return 0x01D00C30; }
+		constexpr uint32_t GetDataSize() { return 40U;}
+		constexpr uint32_t GetDataShift() { return 24U; }	// データ部は左シフトする
+
+		enum Data{
+			FullLight 	= 0x09,
+			NightLight 	= 0x11,
+			Up			= 0x02,
+			Down		= 0x22,
+			Power		= 0x03,
+			HerfLight	= 0x24,
+			Memory		= 0x65,
+			Timer		= 0x24,
+		};
+	}
+}
+
 static inline uint32_t ByteSwap(uint32_t Binary)
 {
 	uint32_t msb = 0;
@@ -106,7 +120,6 @@ static inline uint32_t ByteSwap(uint32_t Binary)
 	msb |= (Binary >> 24) & 0xFF;
 
 	return msb;
-//	return ((Binary & 0xFF) << 24) | (((Binary >> 8) & 0xFF) << 16) | (((Binary >> 16) & 0xFF) << 8) | (((Binary >> 24) & 0xFF));
 }
 
 #endif /* INC_IRCOMMON_H_ */

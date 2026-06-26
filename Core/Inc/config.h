@@ -8,52 +8,59 @@
 #ifndef INC_CONFIG_H_
 #define INC_CONFIG_H_
 
-#include "mylib.h"
 #include "TM1652.h"
-#include "so1602.h"
 #include "encoder.h"
+#include "irCommon.h"
+#include "irEncode.h"
+#include "watchclock.h"
 
-namespace WatchClock{
-	// 型名の後のconstについて
-	// LEDPortの中身は操作できるが、指す対象を変えることは不可能
-	GPIO_TypeDef* const LEDPort = GPIOA;
-	constexpr uint32_t LEDPin = Pin8;
+class Config{
+private:
+	RealClock& rtc;
+public:
+	Config(RealClock& RTCx);
 
-	// TM1652
-	USART_TypeDef* const SegSerial = USART1;
-	GPIO_TypeDef* const SegPort = GPIOB;
-	constexpr uint32_t TxPin = Pin6;
-	constexpr uint32_t RxPin = Pin7;
-	constexpr uint32_t TxAf = LL_GPIO_AF_0;
-	constexpr uint32_t RxAf = LL_GPIO_AF_0;
+	uint32_t WatchSetUp(UART& uart,CoreClock source,TM1652& seg);
+	uint32_t SetDate();
+	uint32_t ConfigAlarm(RealClockSpace::Options alarm,RealClockSpace::Options sel);
 
-	// SO1602
-	I2C_TypeDef* const SO1602Wire = I2C1;
-	GPIO_TypeDef* const SO1602Port = GPIOA;
-	constexpr uint32_t SCLPin = Pin9;
-	constexpr uint32_t SDAPin = Pin10;
-	constexpr uint32_t SCLAf = LL_GPIO_AF_6;
-	constexpr uint32_t SDAAf = LL_GPIO_AF_6;
+	uint32_t EncoderSetUp(TIM& tim,Encoder& encode);
+	uint32_t ButtonSetUp(void);
 
-	// Encoder
-	TIM_TypeDef* const EncoderTimer = TIM3;
-	GPIO_TypeDef* const EncoderPort = GPIOA;
-	constexpr uint32_t ChannelA_Pin = Pin6;
-	constexpr uint32_t ChannelB_Pin = Pin7;
-	constexpr uint32_t ChannelA_Af = LL_GPIO_AF_1;
-	constexpr uint32_t ChannelB_Af = LL_GPIO_AF_1;
+	uint32_t LowFrequencyInit(TIM& lf);
+	uint32_t HighFrequencyInit(TIM& hf);
+	uint32_t irEncodeInit(TIM_TypeDef* LfTim,TIM& lf,TIM& hf,DMA& dma,irEncode& ir);
 
-	// EXTI(Encoder)
-	GPIO_TypeDef* const EncoderPushPort = GPIOB;
-	constexpr uint32_t EncoderPushPin = Pin14;
-	constexpr uint32_t EncoderPushLine = LL_EXTI_LINE_14;
+	void EnterSleepMode(TIM& encoder);
+	void ExitSleepMode(TIM& encoder);
+};
+
+inline void Config::EnterSleepMode(TIM& encoder)
+{
+	using namespace WatchClock;
+
+	encoder.DisablePulse(LL_TIM_CHANNEL_CH1);
+	encoder.DisablePulse(LL_TIM_CHANNEL_CH2);
+	encoder.DisableTimer();
+
+	LL_SYSTICK_DisableIT();
+	LL_EXTI_ClearFallingFlag_0_31(ExtiPin::GetAllExtiLine());
+	LL_EXTI_EnableFallingTrig_0_31(ExtiPin::GetAllExtiLine());
+	GPIO_CLEAR(Indicator::GPIOx,Indicator::IndicatorPos);
 }
 
-uint32_t WatchSetUp(RealClock& rtc,UART& uart,CoreClock source,TM1652& seg);
-uint32_t EncoderSetUp(TIM& tim,Encoder& encode);
-uint32_t ButtonSetUp(void);
-void ConfigLCD(I2C& i2c,CoreClock source,SO1602& lcd);
-uint32_t ConfigDate(RealClock& rtc);
-uint32_t ConfigAlarm(RealClock& rtc,RealClockSpace::Options alarm,RealClockSpace::Options sel);
+inline void Config::ExitSleepMode(TIM& encoder)
+{
+	using namespace WatchClock;
+
+	GPIO_WRITE(Indicator::GPIOx,Indicator::IndicatorPos);
+	LL_SYSTICK_EnableIT();
+	LL_EXTI_ClearFallingFlag_0_31(ExtiPin::GetAllExtiLine());
+	LL_EXTI_DisableFallingTrig_0_31(ExtiPin::GetAllExtiLine());
+
+	encoder.EnablePulse(LL_TIM_CHANNEL_CH1);
+	encoder.EnablePulse(LL_TIM_CHANNEL_CH2);
+	encoder.EnableTimer();
+}
 
 #endif /* INC_CONFIG_H_ */

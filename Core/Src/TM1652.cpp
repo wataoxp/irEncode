@@ -6,21 +6,24 @@
  */
 
 #include "TM1652.h"
+#include <string.h>
 
 using namespace Seg7;
 
-TM1652::TM1652(UART& serial,mDelay pDelay) :uart(serial),delay(pDelay)
+TM1652::TM1652(UART& serial,DelayPoicy& pDelay) :uart(serial),delay(pDelay),CurrentBrightness(0)
 {
 	// ドットを含むと8セグ
 	SelectSeg = Seg8Dig5;
 }
 
+/*** Private ***/
+
+/* 1データ送信後は3ms以上のアイドル状態(UARTではHigh)を作る */
 inline void TM1652::SendData(uint8_t *buf,uint8_t size)
 {
 	uart.TransmitData(buf, size);
+	delay.mDelay(5);
 }
-
-/* 1データ送信後は3ms以上のアイドル状態(UARTではHigh)を作る */
 
 // LSBtoMSB
 uint8_t TM1652::ReverseByte(uint8_t b)
@@ -32,14 +35,19 @@ uint8_t TM1652::ReverseByte(uint8_t b)
 	return b;
 }
 
-void TM1652::Init(uint8_t Current,uint8_t Duty)
+inline uint8_t TM1652::SetAmpereValue(uint8_t ampere)
 {
-	Clear();
-	this->delay(15);
-	SetBrightness(Current,Duty);
-	this->delay(15);
+	// ampereの有効値は0～7なので‐1する
+	return (ReverseByte(MinDuty) | (ReverseByte(ampere-1) >> AmperePos));
 }
 
+inline uint8_t TM1652::SetDutyValue(uint8_t value)
+{
+	uint8_t duty = (value - MaxAmpere);	// Duty設定値を抽出
+	return (ReverseByte(duty) | (ReverseByte(MaxAmpere) >> AmperePos));
+}
+
+/*** Public ***/
 
 void TM1652::Clear(void)
 {
@@ -47,66 +55,74 @@ void TM1652::Clear(void)
 	clear[0] = CommandBase;
 
 	SendData(clear, sizeof(clear));
-	this->delay(5);
+	delay.mDelay(15);
+}
+
+uint8_t TM1652::GetBrightness(void)
+{
+	return CurrentBrightness;
 }
 
 // 駆動電流とデューティー比を設定
-uint32_t TM1652::SetBrightness(uint8_t Current,uint8_t Duty)
+uint32_t TM1652::SetBrightness(uint8_t brightness)
 {
 	uint8_t data[2];
-	uint32_t ret = Success;
-
-	if(Current < MinCurrent || Duty < MinDuty)
-	{
-		Current = MinDuty;
-		Duty = MinDuty;
-		ret = UnderFlow;
-	}
-	else if(Current > MaxCurrent || Duty > MaxDuty)
-	{
-		Current = MaxCurrent;
-		Duty = MaxDuty;
-		ret = OverFlow;
-	}
 
 	data[0] = CommandBase | DispCommand;
-	data[1] = ReverseByte(Duty) & DutyMask;		// ビット反転し下位4ビットを上位へ
-	data[1] |= (ReverseByte(Current) >> 4) & CurrentMask;	// 同様に反転、シフトして下位へ
-	data[1] |= SelectSeg;
+
+	if(brightness == 0)
+	{
+		data[1] = 0;	// 消灯
+	}
+	else if(brightness <= AmpereStepLimit)
+	{
+		data[1] = SetAmpereValue(brightness);
+	}
+	else if(brightness <= MaxBright)
+	{
+		data[1] = SetDutyValue(brightness);
+	}
+	else
+	{
+		return OverFlow;
+	}
+
+	data[1] |= this->SelectSeg;
+
 	SendData(data, sizeof(data));
 
-	this->delay(5);
+	CurrentBrightness = brightness;
 
-	return ret;
+	return Success;
 }
 
-void TM1652::WriteDig(uint8_t d1,uint8_t d2,uint8_t d3,uint8_t d4)
+void TM1652::WriteDig(uint8_t d1,uint8_t d2,uint8_t d3,uint8_t d4,bool colon)
 {
-	uint8_t buffer[5];
-	buffer[0] = CommandBase | 0x00;		// 1桁目を指定
-	buffer[1] = DigNum[d1];
-	buffer[2] = DigNum[d2];
-	buffer[3] = DigNum[d3];
-	buffer[4] = DigNum[d4];
+	uint8_t data[4] = {d1,d2,d3,d4};
 
-	SendData(buffer, sizeof(buffer));
-	this->delay(5);
+	WriteDigPos(data, 1, 4,colon);
 }
 
-void TM1652::WriteDig(uint8_t d1,uint8_t d2,uint8_t d3,uint8_t d4,bool dot)
+uint32_t TM1652::WriteDigPos(uint8_t* data,uint8_t pos,uint8_t length,bool colon)
 {
 	uint8_t buffer[5];
-	buffer[0] = CommandBase | 0x00;		// 1桁目を指定
-	buffer[1] = DigNum[d1];
-	buffer[2] = DigNum[d2];
-	buffer[3] = DigNum[d3];
-	buffer[4] = DigNum[d4];
 
-	if(dot)
+	if(!pos || length > MaxDigNum) return Failed;
+
+	buffer[0] = CommandBase | ReverseByte(pos-1);
+
+	for (uint8_t i = 0; i < length; i++)
+	{
+		buffer[i + 1] = DigNum[(data[i])];
+	}
+
+	if(colon && pos <= ColonPos)	// GR2への書き込み時のみコロンを操作できる
 	{
 		buffer[2] |= 0x80;
 	}
 
-	SendData(buffer, sizeof(buffer));
-	this->delay(5);
+	SendData(buffer, length+1);
+
+	return Success;
 }
+

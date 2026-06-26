@@ -18,6 +18,7 @@ typedef struct{
 	uint32_t MemoryInc;
 	uint32_t PeriphSize;
 	uint32_t MemorySize;
+	uint32_t Priority;
 }DMA_InitTypdef;
 
 class DMA{

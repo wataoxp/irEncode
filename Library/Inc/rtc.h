@@ -33,12 +33,15 @@ namespace RealClockSpace{
 	enum class Options :uint8_t{
 		Alarm_Enable,
 		Alarm_Disable,
-		ALMA,
-		ALMB,
-		ALMA_ALMB,
 		NoneAlarm,
 		WakeUp_Enable,
 		WakeUp_Disable,
+	};
+
+	enum class AlarmType : uint8_t{
+		ALMA,
+		ALMB,
+		ALMA_ALMB,
 	};
 
 	typedef struct{
@@ -54,28 +57,38 @@ namespace RealClockSpace{
 
 	typedef struct{
 		Options Alarm;
-		Options SelectAlarm;
+		AlarmType SelectAlarm;
 		Options WakeUp;
-
-		uint8_t Hours;
-		uint8_t Minutes;
-		uint8_t Seconds;
-		uint8_t WeekDay;
-		uint8_t Month;
-		uint8_t Day;
-		uint8_t Year;
 
 		AlarmStatus ALMA;
 		AlarmStatus ALMB;
 
-	}ConfigParameters;
+	}AlarmParameters;
+
+	typedef struct{
+		uint8_t WeekDay;
+		uint8_t Month;
+		uint8_t Day;
+		uint8_t Year;
+	}DateConfig;
+
+	constexpr uint32_t GetAlmaMaskSeconds() { return (LL_RTC_ALMA_MASK_DATEWEEKDAY | LL_RTC_ALMA_MASK_HOURS | LL_RTC_ALMA_MASK_MINUTES); }
+	constexpr uint32_t GetAlmbMaskSeconds() { return (LL_RTC_ALMB_MASK_DATEWEEKDAY | LL_RTC_ALMB_MASK_HOURS | LL_RTC_ALMB_MASK_MINUTES); }
+
+	constexpr uint32_t GetAlmaMaskMinutes() { return (LL_RTC_ALMA_MASK_DATEWEEKDAY); }
+	constexpr uint32_t GetAlmbMaskMinutes() { return (LL_RTC_ALMB_MASK_DATEWEEKDAY); }
+
+	constexpr uint32_t ALMAMaskIsSeconds = (LL_RTC_ALMA_MASK_DATEWEEKDAY | LL_RTC_ALMA_MASK_HOURS | LL_RTC_ALMA_MASK_MINUTES);
+	constexpr uint32_t ALMBMaskIsSeconds = (LL_RTC_ALMB_MASK_DATEWEEKDAY | LL_RTC_ALMB_MASK_HOURS | LL_RTC_ALMB_MASK_MINUTES);
+	constexpr uint32_t ALMAMaskIsHoursMinutes = (LL_RTC_ALMA_MASK_DATEWEEKDAY);
+	constexpr uint32_t ALMBMaskIsHoursMinutes = (LL_RTC_ALMB_MASK_DATEWEEKDAY);
 
 	typedef struct{
 		uint8_t HourTens;		// HT
 		uint8_t HourUnits;		// HU
 		uint8_t MinuteTens;		// MNT
 		uint8_t MinuteUnits;	// MNU
-		uint8_t SecondTens;	// SNT
+		uint8_t SecondTens;		// SNT
 		uint8_t SecondUnits;	// SNU
 	}TimeRegBitField;
 
@@ -105,8 +118,8 @@ public:
 	uint32_t Config(uint32_t HourFormat,uint32_t AsynchPrescaler,uint32_t SynchPrescaler);
 	uint32_t SetTime(uint32_t Format,uint32_t Hours,uint32_t Minutes,uint32_t Seconds);
 	uint32_t SetDate(uint32_t WeekDay,uint32_t Month,uint32_t Day,uint32_t Year);
-	uint32_t SetAlarm(RealClockSpace::ConfigParameters *init);
-	uint32_t DisableAlarm(RealClockSpace::Options select);
+	uint32_t SetAlarm(RealClockSpace::AlarmParameters *init);
+	uint32_t DisableAlarm(RealClockSpace::AlarmType select);
 	void SetWakeUpTimer(uint32_t Count);
 	void GetTimeRegister(RealClockSpace::TimeRegBitField *tr);
 	void GetDateRegister(RealClockSpace::DateRegBitFiled *dr);

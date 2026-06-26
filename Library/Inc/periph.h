@@ -72,6 +72,8 @@
 typedef enum{
 	HSICLOCK = 16,
 	PLLCLOCK = 64,
+	C0xHSI	 = 48,
+	C0xDivHSI = (48/4),
 }CoreClock;
 
 typedef enum{

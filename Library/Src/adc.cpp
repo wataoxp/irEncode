@@ -6,17 +6,15 @@
  */
 
 #include "adc.h"
-#include "delay.h"
 
-using namespace ADC_Parameter;
+using namespace AnalogParameter;
 
 AnalogConverter::AnalogConverter(ADC_TypeDef *ADCPort) :ADCx(ADCPort)
 {
 	;
 }
 
-template <typename wait>
-uint32_t AnalogConverter::Config(ADC_ConfigTypedef* Config,uint32_t Channel)
+uint32_t AnalogConverter::Config(ADC_ConfigTypedef* Config,uint32_t Channel,DelayPoicy& delay)
 {
 	uint32_t ret = 0;
 
@@ -34,11 +32,11 @@ uint32_t AnalogConverter::Config(ADC_ConfigTypedef* Config,uint32_t Channel)
 	CLEAR_REG(ADCx->CFGR2);
 
 	LL_ADC_EnableInternalRegulator(ADCx);
-	wait::uDelay(30);	//レギュレータの安定化待ち。データシート上では20us。
+	delay.uDelay(30);								// レギュレータの安定化待ち。データシート上では20us。
 
 	LL_ADC_SetResolution(ADCx, Config->Resolution);
 	LL_ADC_SetDataAlignment(ADCx, Config->DataAlignment);
-	LL_ADC_SetClock(ADCx, Config->Clock);					//ADCクロック。最大で35MHz
+	LL_ADC_SetClock(ADCx, Config->Clock);					// ADCクロック。最大で35MHz
 	LL_ADC_SetTriggerFrequencyMode(ADCx, LL_ADC_CLOCK_FREQ_MODE_HIGH);	// 低周波数モード。無効
 
 	ret += RegConfig(Config, Channel);
@@ -54,10 +52,6 @@ uint32_t AnalogConverter::Config(ADC_ConfigTypedef* Config,uint32_t Channel)
 
 	return ret;
 }
-
-template uint32_t AnalogConverter::Config<DelayMode::Standard>(ADC_ConfigTypedef* Config,uint32_t Channel);
-template uint32_t AnalogConverter::Config<DelayMode::RtosMode>(ADC_ConfigTypedef* Config,uint32_t Channel);
-
 
 uint32_t AnalogConverter::RegConfig(ADC_ConfigTypedef *RegConfig,uint32_t Channel)
 {

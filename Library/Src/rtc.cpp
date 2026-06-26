@@ -255,7 +255,7 @@ uint32_t RealClock::SetDate(uint32_t WeekDay,uint32_t Month,uint32_t Day,uint32_
 	return ret;
 }
 
-uint32_t RealClock::SetAlarm(ConfigParameters *init)
+uint32_t RealClock::SetAlarm(AlarmParameters *init)
 {
 	uint32_t ret = Alarm_NotModule;
 
@@ -263,12 +263,12 @@ uint32_t RealClock::SetAlarm(ConfigParameters *init)
 
 	LL_RTC_DisableWriteProtection(RTCx);
 
-	if((init->SelectAlarm == Options::ALMA) || (init->SelectAlarm == Options::ALMA_ALMB))
+	if((init->SelectAlarm == AlarmType::ALMA) || (init->SelectAlarm == AlarmType::ALMA_ALMB))
 	{
 		SetALMA(&(init->ALMA));
 		ret = Success;
 	}
-	if((init->SelectAlarm == Options::ALMB) || (init->SelectAlarm == Options::ALMA_ALMB))
+	if((init->SelectAlarm == AlarmType::ALMB) || (init->SelectAlarm == AlarmType::ALMA_ALMB))
 	{
 		SetALMB(&(init->ALMB));
 		ret = Success;
@@ -280,7 +280,7 @@ uint32_t RealClock::SetAlarm(ConfigParameters *init)
 	return ret;
 }
 
-uint32_t RealClock::DisableAlarm(RealClockSpace::Options select)
+uint32_t RealClock::DisableAlarm(RealClockSpace::AlarmType select)
 {
 	uint32_t ret = Alarm_NotModule;
 
@@ -288,14 +288,14 @@ uint32_t RealClock::DisableAlarm(RealClockSpace::Options select)
 
 	LL_RTC_DisableWriteProtection(RTCx);
 
-	if(select == Options::ALMA || select == Options::ALMA_ALMB)
+	if(select == AlarmType::ALMA || select == AlarmType::ALMA_ALMB)
 	{
 		while(LL_RTC_IsActiveFlag_ALRAW(RTCx) == 0);
 		LL_RTC_ClearFlag_ALRA(RTCx);
 		LL_RTC_DisableIT_ALRA(RTCx);
 		LL_RTC_ALMA_Disable(RTCx);
 	}
-	if(select == Options::ALMB || select == Options::ALMA_ALMB)
+	if(select == AlarmType::ALMB || select == AlarmType::ALMA_ALMB)
 	{
 		while(LL_RTC_IsActiveFlag_ALRBW(RTCx) == 0);
 		LL_RTC_ClearFlag_ALRB(RTCx);
@@ -392,7 +392,7 @@ uint32_t RealClock::EnableAlarm(Options SelectAlarm)
 
 	LL_RTC_DisableWriteProtection(RTCx);
 
-	if((SelectAlarm == Options::ALMA) || (SelectAlarm == Options::ALMA_ALMB))
+	if((SelectAlarm == AlarmType::ALMA) || (SelectAlarm == AlarmType::ALMA_ALMB))
 	{
 		LL_RTC_ALMA_Disable(RTCx);
 		while(LL_RTC_IsActiveFlag_ALRAW(RTCx) == 0);
@@ -402,7 +402,7 @@ uint32_t RealClock::EnableAlarm(Options SelectAlarm)
 
 		ret = Success;
 	}
-	if((SelectAlarm == Options::ALMB) || (SelectAlarm == Options::ALMA_ALMB))
+	if((SelectAlarm == AlarmType::ALMB) || (SelectAlarm == AlarmType::ALMA_ALMB))
 	{
 		LL_RTC_ALMB_Disable(RTCx);
 		while(LL_RTC_IsActiveFlag_ALRBW(RTCx) == 0);

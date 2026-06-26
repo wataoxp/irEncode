@@ -40,8 +40,6 @@ void RCC_Config(CoreClock source,rccStatus ClockSource)
 	{
 		rcc.Latency = LL_FLASH_LATENCY_2;
 	}
-	rcc.clock = frequency;
-
 	ConfigHighClock(&rcc,ClockSource);
 
 	if(source > HSICLOCK)
@@ -55,15 +53,24 @@ void RCC_Config(CoreClock source,rccStatus ClockSource)
 	}
 }
 #elif defined(STM32C0)
-void RCC_Config(void)
+void RCC_Config(uint32_t HsiDiv)
 {
 	RCC_InitTypedef rcc;
-	rcc.Latency = LL_FLASH_LATENCY_1;
-	rcc.HSIdiv = LL_RCC_HSI_DIV_1;
-	rcc.AHBdiv = LL_RCC_SYSCLK_DIV_1;
+	rcc.HSIdiv = HsiDiv;
+	rcc.AHBdiv = LL_RCC_HCLK_DIV_1;
 	rcc.SysClkSrc = LL_RCC_SYS_CLKSOURCE_HSI;
 	rcc.APBdiv = LL_RCC_APB1_DIV_1;
-	rcc.clock = 48000000;
+
+	// 24MHz以上であるならレイテンシが必要
+	if(rcc.HSIdiv <= LL_RCC_HSI_DIV_2)
+	{
+		rcc.Latency = LL_FLASH_LATENCY_1;
+	}
+	else
+	{
+		rcc.Latency = LL_FLASH_LATENCY_0;
+	}
+
 	RCC_InitC0(&rcc);
 }
 #endif
@@ -84,51 +91,6 @@ uint32_t RTC_Config(RealClock& rtc)
 
 	return rtc.Config(LL_RTC_HOURFORMAT_24HOUR, AsynchDefault, SynchDefault);
 }
-
-//void RTC_StructInit(RealClockSpace::ConfigParameters *init)
-//{
-//	using namespace RealClockSpace;
-//
-//	init->Alarm = Options::Alarm_Disable;
-//	init->SelectAlarm = Options::ALMA;
-//	init->WakeUp = Options::WakeUp_Enable;
-//	init->Hours = 15;
-//	init->Minutes = 07;
-//	init->Seconds = 0;
-//	init->WeekDay = LL_RTC_WEEKDAY_TUESDAY;
-//	init->Month = LL_RTC_MONTH_FEBRUARY;
-//	init->Day = 3;
-//	init->Year = 26;
-//
-//	if(init->Alarm == Options::Alarm_Enable)
-//	{
-//		if((init->SelectAlarm == Options::ALMA) || (init->SelectAlarm == Options::ALMA_ALMB))
-//		{
-//			init->ALMA.Hours = 0;
-//			init->ALMA.Minutes = 0;
-//			init->ALMA.Seconds = 0;
-//
-//			init->ALMA.Day = 0;
-//			init->ALMA.WeekDaySel = AlarmValue::WeekDay_Disable;
-//
-//			// 日付、時間、分の指定をマスク(無視)
-//			init->ALMA.Mask = LL_RTC_ALMA_MASK_DATEWEEKDAY | LL_RTC_ALMA_MASK_HOURS
-//					|LL_RTC_ALMA_MASK_MINUTES;
-//		}
-//		if((init->SelectAlarm == Options::ALMB) || (init->SelectAlarm == Options::ALMA_ALMB))
-//		{
-//			init->ALMB.Hours = 0;
-//			init->ALMB.Minutes = 0;
-//			init->ALMB.Seconds = 10;
-//			init->ALMB.Day = 0;
-//			init->ALMB.WeekDaySel = AlarmValue::WeekDay_Disable;
-//
-//			init->ALMB.Mask = LL_RTC_ALMB_MASK_DATEWEEKDAY | LL_RTC_ALMB_MASK_HOURS
-//								|LL_RTC_ALMB_MASK_MINUTES;
-//		}
-//	}
-//}
-
 
 uint32_t GPIO_Config(GPIO_TypeDef *GPIOx,uint32_t pin,uint32_t Mode)
 {
@@ -154,7 +116,8 @@ uint32_t GPIO_Config(GPIO_TypeDef *GPIOx,uint32_t pin,uint32_t Mode)
 	return ret;
 }
 
-uint32_t MCO_Config(GPIO_TypeDef *GPIOx,uint32_t Pin,uint32_t AF,uint32_t Source,uint32_t Div)
+// SysClkで計測
+uint32_t MCO_Config(GPIO_TypeDef *GPIOx,uint32_t Pin,uint32_t AF,uint32_t source,uint32_t Div)
 {
 	uint32_t ret = 0;
 
@@ -164,8 +127,20 @@ uint32_t MCO_Config(GPIO_TypeDef *GPIOx,uint32_t Pin,uint32_t AF,uint32_t Source
 	MCO.SetParameter(LL_GPIO_PULL_NO, LL_GPIO_MODE_ALTERNATE, LL_GPIO_SPEED_FREQ_LOW, LL_GPIO_OUTPUT_PUSHPULL);
 	MCO.AlternateInit(AF);
 
-	LL_RCC_ConfigMCO(Source, Div);
-
+	if(source == LL_RCC_MCO1SOURCE_SYSCLK)
+	{
+		LL_RCC_ConfigMCO(source, Div);
+	}
+#ifdef LL_RCC_MCO2SOURCE_SYSCLK
+	else if(source == LL_RCC_MCO2SOURCE_SYSCLK)
+	{
+		LL_RCC_ConfigMCO2(source, Div);
+	}
+#endif
+	else
+	{
+		ret += 1;
+	}
 	return ret;
 }
 
@@ -183,6 +158,64 @@ uint32_t EXTI_Config(GPIO_TypeDef *GPIOx,uint32_t pin,uint32_t Pull,uint8_t Exti
 	IOPin.InputInit();
 
 	return ret;
+}
+
+uint32_t ADC_Config(ADC_TypeDef *ADCx,AnalogConverter& adc,uint32_t adc_channel,GPIO_TypeDef *GPIOx,uint32_t pin,DelayPoicy& delay)
+{
+	using namespace AnalogParameter;
+
+	uint32_t ret = 0;
+	ADC_ConfigTypedef Config = {0};
+	GPIO Conv(GPIOx,pin);
+
+	ret = Conv.Begin();		//GPIOは初期状態でアナログ入力なのでそのままでも一応動く
+	Conv.SetParameter(LL_GPIO_PULL_NO, LL_GPIO_MODE_ANALOG, LL_GPIO_SPEED_FREQ_LOW, LL_GPIO_OUTPUT_PUSHPULL);
+	Conv.InputInit();
+
+	Config.Clock = LL_ADC_CLOCK_SYNC_PCLK_DIV2;		// PCLK/2がもっとも汎用性が高い。DIV1はPLL必須
+	Config.Resolution = LL_ADC_RESOLUTION_8B;		// 分解能
+	Config.DataAlignment = LL_ADC_DATA_ALIGN_RIGHT;	// 右または左寄せ
+
+	Config.SamplingTime1 = LL_ADC_SAMPLINGTIME_160CYCLES_5;	// サンプリングサイクル
+	Config.SamplingTime2 = LL_ADC_SAMPLINGTIME_160CYCLES_5;
+	Config.OverRun = LL_ADC_REG_OVR_DATA_OVERWRITTEN;		// オーバーラン時にDRの値を保持or上書き
+
+	Config.Configurability = LL_ADC_REG_SEQ_FIXED;			// 変換モード
+	Config.SequencerLength = LL_ADC_REG_SEQ_SCAN_DISABLE;	// シーケンス変換の終了位置
+
+	Config.ExternalTrigger = SoftTrigger;
+
+	// 外部トリガの有効、および極性の選択&外部トリガの選択。デフォルトは0
+	if(Config.ExternalTrigger == ExTrigger)
+	{
+		Config.TriggerSource = LL_ADC_REG_TRIG_EXT_TIM3_TRGO;
+		Config.TriggerEdge = LL_ADC_REG_TRIG_EXT_RISING;
+	}
+
+	ret += adc.Config(&Config,adc_channel,delay);
+
+	LL_ADC_StartCalibration(ADCx);
+	while((ADCx->CR & ADC_CR_ADCAL) != 0U);
+
+	return ret;
+}
+
+uint32_t DMA_Config(DMA& dma,uint32_t Channel,uint32_t ReqID,uint32_t *MemoryAddress,uint32_t *PeriphAddress)
+{
+	DMA_InitTypdef Config ={0};
+
+	Config.RequestID = ReqID;
+	Config.Direction = LL_DMA_DIRECTION_MEMORY_TO_PERIPH;
+	Config.TransferMode = LL_DMA_MODE_NORMAL;
+	Config.PeriphInc = LL_DMA_PERIPH_NOINCREMENT;
+	Config.MemoryInc = LL_DMA_MEMORY_INCREMENT;
+	Config.PeriphSize = LL_DMA_PDATAALIGN_WORD;
+	Config.MemorySize = LL_DMA_MDATAALIGN_BYTE;
+	Config.Priority = LL_DMA_PRIORITY_VERYHIGH;		// 複数のDMAチャネルが競合する時の優先度？
+
+	dma.Config(&Config, Channel);
+
+	return dma.AddressSet(Channel, MemoryAddress,PeriphAddress);
 }
 
 uint32_t I2C_Config(CoreClock clock,I2C& i2c,GPIO_TypeDef *PortSCL,uint32_t PinSCL,uint32_t SCL_AF,GPIO_TypeDef *PortSDA,uint32_t PinSDA,uint32_t SDA_AF)
@@ -272,7 +305,7 @@ uint32_t SPI_MISO_Config(GPIO_TypeDef *GPIOx,uint32_t Pin)
 	return ret;
 }
 
-uint32_t UART_Config(UART& uart,uint32_t sysclk,GPIO_TypeDef *TxPort,uint32_t TxPin,uint32_t TxAf,GPIO_TypeDef *RxPort,uint32_t RxPin,uint32_t RxAf)
+uint32_t UART_Config(UART& uart,CoreClock sysclk,GPIO_TypeDef *TxPort,uint32_t TxPin,uint32_t TxAf,GPIO_TypeDef *RxPort,uint32_t RxPin,uint32_t RxAf)
 {
 	uint32_t ret = 0;
 
@@ -285,7 +318,7 @@ uint32_t UART_Config(UART& uart,uint32_t sysclk,GPIO_TypeDef *TxPort,uint32_t Tx
 	init.Parity = LL_USART_PARITY_ODD;
 
 	// 転送方向の設定
-	init.Direction = LL_USART_DIRECTION_TX;
+	init.Direction = LL_USART_DIRECTION_TX_RX;
 
 	// データのサンプリング回数の設定
 	init.OverSampling = LL_USART_OVERSAMPLING_16;
@@ -326,7 +359,7 @@ uint32_t UART_Config(UART& uart,uint32_t sysclk,GPIO_TypeDef *TxPort,uint32_t Tx
 		ret = 1;
 	}
 
-	uart.Config(&init,sysclk);
+	uart.Config(&init,(sysclk*1000*1000));
 
 	return ret;
 }
@@ -384,62 +417,5 @@ uint32_t PWM_Config(TIM& tim,GPIO_TypeDef *GPIOx,uint32_t pin,uint32_t Alternate
 	return ret;
 }
 
-template <typename wait>
-uint32_t ADC_Config(ADC_TypeDef *ADCx,AnalogConverter& adc,uint32_t adc_channel,GPIO_TypeDef *GPIOx,uint32_t pin)
-{
-	uint32_t ret = 0;
-	ADC_Parameter::ADC_ConfigTypedef Config = {0};
-	GPIO Conv(GPIOx,pin);
 
-	ret = Conv.Begin();		//GPIOは初期状態でアナログ入力なのでそのままでも一応動く
-	Conv.SetParameter(LL_GPIO_PULL_NO, LL_GPIO_MODE_ANALOG, LL_GPIO_SPEED_FREQ_LOW, LL_GPIO_OUTPUT_PUSHPULL);
-	Conv.InputInit();
-
-	Config.Clock = LL_ADC_CLOCK_SYNC_PCLK_DIV2;		// PCLK/2がもっとも汎用性が高い。DIV1はPLL必須
-	Config.Resolution = LL_ADC_RESOLUTION_8B;		// 分解能
-	Config.DataAlignment = LL_ADC_DATA_ALIGN_RIGHT;	// 右または左寄せ
-
-	Config.SamplingTime1 = LL_ADC_SAMPLINGTIME_39CYCLES_5;
-	Config.SamplingTime2 = LL_ADC_SAMPLINGTIME_39CYCLES_5;
-	Config.OverRun = LL_ADC_REG_OVR_DATA_OVERWRITTEN;		// オーバーラン時にDRの値を保持or上書き
-
-	Config.Configurability = LL_ADC_REG_SEQ_FIXED;			// 変換モード
-	Config.SequencerLength = LL_ADC_REG_SEQ_SCAN_DISABLE;	// シーケンス変換の終了位置
-
-	Config.ExternalTrigger = ADC_Parameter::SoftTrigger;
-
-	// 外部トリガの有効、および極性の選択&外部トリガの選択。デフォルトは0
-	if(Config.ExternalTrigger == ADC_Parameter::ExTrigger)
-	{
-		Config.TriggerSource = LL_ADC_REG_TRIG_EXT_TIM3_TRGO;
-		Config.TriggerEdge = LL_ADC_REG_TRIG_EXT_RISING;
-	}
-
-	ret += adc.Config<wait>(&Config,adc_channel);
-
-	LL_ADC_StartCalibration(ADCx);
-	while((ADCx->CR & ADC_CR_ADCAL) != 0U);
-
-	return ret;
-}
-
-template uint32_t ADC_Config<DelayMode::Standard>(ADC_TypeDef *ADCx,AnalogConverter& adc,uint32_t adc_channel,GPIO_TypeDef *GPIOx,uint32_t pin);
-template uint32_t ADC_Config<DelayMode::RtosMode>(ADC_TypeDef *ADCx,AnalogConverter& adc,uint32_t adc_channel,GPIO_TypeDef *GPIOx,uint32_t pin);
-
-uint32_t DMA_Config(DMA& dma,uint32_t Channel,uint32_t ReqID,uint32_t *MemoryAddress,uint32_t *PeriphAddress)
-{
-	DMA_InitTypdef Config ={0};
-
-	Config.RequestID = ReqID;
-	Config.Direction = LL_DMA_DIRECTION_MEMORY_TO_PERIPH;
-	Config.TransferMode = LL_DMA_MODE_NORMAL;
-	Config.PeriphInc = LL_DMA_PERIPH_NOINCREMENT;
-	Config.MemoryInc = LL_DMA_MEMORY_INCREMENT;
-	Config.PeriphSize = LL_DMA_PDATAALIGN_WORD;
-	Config.MemorySize = LL_DMA_MDATAALIGN_WORD;
-
-	dma.Config(&Config, Channel);
-
-	return dma.AddressSet(Channel, MemoryAddress,PeriphAddress);
-}
 

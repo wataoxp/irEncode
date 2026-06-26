@@ -9,8 +9,9 @@
 #define ADC_H_
 
 #include "periph.h"
+#include "delay.h"
 
-namespace ADC_Parameter{
+namespace AnalogParameter{
 	typedef enum{
 		SoftTrigger,
 		ExTrigger,
@@ -43,18 +44,15 @@ namespace ADC_Parameter{
 	}ADC_ConfigTypedef;
 }
 
-
-
 class AnalogConverter{
 private:
 	ADC_TypeDef *ADCx;
-	uint32_t RegConfig(ADC_Parameter::ADC_ConfigTypedef *RegConfig,uint32_t Channel);
+	uint32_t RegConfig(AnalogParameter::ADC_ConfigTypedef *RegConfig,uint32_t Channel);
 	void SingleMode(uint32_t Channel);
 	uint32_t SequenceMode(uint32_t Channel,uint32_t length);
 public:
 	AnalogConverter(ADC_TypeDef *ADCPort);
-	template <typename wait>
-	uint32_t Config(ADC_Parameter::ADC_ConfigTypedef* Config,uint32_t Channel);
+	uint32_t Config(AnalogParameter::ADC_ConfigTypedef* Config,uint32_t Channel,DelayPoicy& delay);
 
 	uint16_t StartSoftConvert(void);
 	void DisableADC(void);
