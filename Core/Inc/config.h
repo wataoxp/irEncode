@@ -1,66 +1,55 @@
 /*
  * config.h
  *
- *  Created on: Feb 21, 2026
+ *  Created on: Jun 26, 2026
  *      Author: wataoxp
  */
 
 #ifndef INC_CONFIG_H_
 #define INC_CONFIG_H_
 
-#include "TM1652.h"
-#include "encoder.h"
-#include "irCommon.h"
-#include "irEncode.h"
-#include "watchclock.h"
 
-class Config{
-private:
-	RealClock& rtc;
-public:
-	Config(RealClock& RTCx);
+namespace SendIR {
+	namespace LfTimer{
+		TIM_TypeDef* const Timer = TIM16;	// 基準周波数
+		enum Parameter{
+			Channel		= LL_TIM_CHANNEL_CH1,
+			Period	   	= 1000,		// DMAで変更される
+			Prescaler 	= 16,		// 1us分解能
+		};
 
-	uint32_t WatchSetUp(UART& uart,CoreClock source,TM1652& seg);
-	uint32_t SetDate();
-	uint32_t ConfigAlarm(RealClockSpace::Options alarm,RealClockSpace::Options sel);
+		GPIO_TypeDef* const GPIOx = GPIOB;
+		enum PinConfig{
+			PinPos 		= Pin8,
+			Alternate	= LL_GPIO_AF_2,
+		};
+	};
 
-	uint32_t EncoderSetUp(TIM& tim,Encoder& encode);
-	uint32_t ButtonSetUp(void);
+	namespace HfTimer{
+		TIM_TypeDef* const Timer = TIM17;	// 38kHzキャリア周波数
 
-	uint32_t LowFrequencyInit(TIM& lf);
-	uint32_t HighFrequencyInit(TIM& hf);
-	uint32_t irEncodeInit(TIM_TypeDef* LfTim,TIM& lf,TIM& hf,DMA& dma,irEncode& ir);
+		enum Parameter{
+			Channel 	= LL_TIM_CHANNEL_CH1,
+			Period 		= 413,		// 16M/413 = 38.74kHz
+			Duty 		= 3,		// デューティー比30%
+			Prescaler 	= 1,		// リロード値で周波数は設定済み
+		};
 
-	void EnterSleepMode(TIM& encoder);
-	void ExitSleepMode(TIM& encoder);
-};
+		GPIO_TypeDef* const GPIOx = GPIOB;
+		enum PinConfig{
+			PinPos 		= Pin9,
+			Alternate	= LL_GPIO_AF_0,
+		};
+	};
 
-inline void Config::EnterSleepMode(TIM& encoder)
-{
-	using namespace WatchClock;
-
-	encoder.DisablePulse(LL_TIM_CHANNEL_CH1);
-	encoder.DisablePulse(LL_TIM_CHANNEL_CH2);
-	encoder.DisableTimer();
-
-	LL_SYSTICK_DisableIT();
-	LL_EXTI_ClearFallingFlag_0_31(ExtiPin::GetAllExtiLine());
-	LL_EXTI_EnableFallingTrig_0_31(ExtiPin::GetAllExtiLine());
-	GPIO_CLEAR(Indicator::GPIOx,Indicator::IndicatorPos);
+	namespace MemoryAccess{
+		DMA_TypeDef* const Handle = DMA1;
+		enum Parameter{
+			Channel 	= LL_DMA_CHANNEL_2,
+		};
+	}
 }
 
-inline void Config::ExitSleepMode(TIM& encoder)
-{
-	using namespace WatchClock;
 
-	GPIO_WRITE(Indicator::GPIOx,Indicator::IndicatorPos);
-	LL_SYSTICK_EnableIT();
-	LL_EXTI_ClearFallingFlag_0_31(ExtiPin::GetAllExtiLine());
-	LL_EXTI_DisableFallingTrig_0_31(ExtiPin::GetAllExtiLine());
-
-	encoder.EnablePulse(LL_TIM_CHANNEL_CH1);
-	encoder.EnablePulse(LL_TIM_CHANNEL_CH2);
-	encoder.EnableTimer();
-}
 
 #endif /* INC_CONFIG_H_ */

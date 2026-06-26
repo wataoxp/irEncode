@@ -1,13 +1,8 @@
 #include "mylib.h"
 #include "config.h"
-#include "clockview.h"
-#include "state.h"
 #include "isr.h"
 #include "irEncode.h"
 
-#include "watchclock.h"
-
-using namespace WatchClock;
 using namespace SendIR;
 
 void TransferIR(TIM& hf,TIM& lf,DMA& dma,uint32_t Length);
@@ -32,11 +27,11 @@ int main(void)
 
 	irEncodeUnits::EncodeByteData TxData[2] = {
 			DeviceCommands::ED505::GetLeaderCode(),
-			DeviceCommands::ED505::Power << DeviceCommands::ED505::GetDataShift(),
+			DeviceCommands::ED505::HerfLight << DeviceCommands::ED505::GetDataShift(),
 	};
 
 	irEncodeGate<48> irGate;
-	irGate.SetPulseLength(40);		// データビットのみ
+	irGate.SetPulseLength(DeviceCommands::ED505::GetDataSize());		// データビットのみ
 	irGate.initEncodeData(TxData, Infrared::FormatSymbol::AEHA);
 	irEncodeInit(LfTimer::Timer, LF, HF, dma, irGate.GetPulseAddress());
 
@@ -51,7 +46,7 @@ int main(void)
 
 uint32_t irEncodeInit(TIM_TypeDef* LfTim,TIM& lf,TIM& hf,DMA& dma,irEncodeUnits::EncodePulseData* Address)
 {
-	using namespace WatchClock::SendIR::MemoryAccess;
+	using namespace SendIR::MemoryAccess;
 	uint32_t ret = 0;
 
 	ret += HighFrequencyInit(hf);
@@ -62,7 +57,7 @@ uint32_t irEncodeInit(TIM_TypeDef* LfTim,TIM& lf,TIM& hf,DMA& dma,irEncodeUnits:
 
 	LL_DMA_SetDataTransferDirection(Handle, Channel, LL_DMA_DIRECTION_MEMORY_TO_PERIPH);
 	LL_DMA_SetMemorySize(Handle, Channel, LL_DMA_MDATAALIGN_HALFWORD);
-	LL_TIM_ConfigDMABurst(WatchClock::SendIR::LfTimer::Timer, LL_TIM_DMABURST_BASEADDR_ARR, LL_TIM_DMABURST_LENGTH_3TRANSFERS);
+	LL_TIM_ConfigDMABurst(LfTimer::Timer, LL_TIM_DMABURST_BASEADDR_ARR, LL_TIM_DMABURST_LENGTH_3TRANSFERS);
 
 	LL_SYSCFG_SetIRModEnvelopeSignal(LL_SYSCFG_IR_MOD_TIM16);
 	LL_SYSCFG_SetIRPolarity(LL_SYSCFG_IR_POL_INVERTED);		//TIM出力とのXOR
@@ -76,7 +71,7 @@ uint32_t irEncodeInit(TIM_TypeDef* LfTim,TIM& lf,TIM& hf,DMA& dma,irEncodeUnits:
 
 uint32_t LowFrequencyInit(TIM& lf)
 {
-	using namespace WatchClock::SendIR::LfTimer;
+	using namespace SendIR::LfTimer;
 
 	TIM_Config(lf, Prescaler, Period);
 #ifdef DEBUG
@@ -88,7 +83,7 @@ uint32_t LowFrequencyInit(TIM& lf)
 
 uint32_t HighFrequencyInit(TIM& hf)
 {
-	using namespace WatchClock::SendIR::HfTimer;
+	using namespace SendIR::HfTimer;
 
 	TIM_Config(hf, Prescaler, Period);
 	hf.SetCH1CompareValue(Period/Duty);
@@ -98,7 +93,7 @@ uint32_t HighFrequencyInit(TIM& hf)
 
 void TransferIR(TIM& hf,TIM& lf,DMA& dma,uint32_t Length)
 {
-	using namespace WatchClock::SendIR;
+	using namespace SendIR;
 
 	hf.EnableTimer();
 	hf.EnablePulse(HfTimer::Channel);

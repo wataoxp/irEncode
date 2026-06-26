@@ -8,9 +8,6 @@
 
 #include "isr.h"
 #include "debounce.h"
-#include "watchclock.h"
-
-using namespace WatchClock;
 
 // __IOを除いたことで最適化の影響を受けるかもしれない
 static isrFlags iFlag;
@@ -31,22 +28,6 @@ void ResetIntCommand(void)
 	iFlag.IntCommand = 0;
 }
 
-void ResetWutFlag(void)
-{
-	iFlag.IntCommand &= ~Parameter::WutFlagVal;
-}
-
-void ResetAlmaFlag(void)
-{
-	iFlag.IntCommand &= ~Parameter::AlmaFlagVal;
-
-}
-
-void ResetAlmbFlag(void)
-{
-	iFlag.IntCommand &= ~Parameter::AlmbFlagVal;
-}
-
 /* Interrupt Service Routine */
 
 extern "C"{
@@ -61,32 +42,6 @@ void SysTick_Handler(void)
 	}
 	mTick = 0;
 	Debounce::ButtonFilter(iFlag.ExtCommand);
-}
-
-void RTC_TAMP_IRQHandler(void)
-{
-	if(LL_RTC_IsActiveFlag_ALRA(RTC))
-	{
-		LL_RTC_ClearFlag_ALRA(RTC);
-		iFlag.IntCommand |= Parameter::AlmaFlagVal;
-	}
-
-	if(LL_RTC_IsActiveFlag_ALRB(RTC))
-	{
-		LL_RTC_ClearFlag_ALRB(RTC);
-		iFlag.IntCommand |= Parameter::AlmbFlagVal;
-	}
-
-	if(LL_RTC_IsActiveFlag_WUT(RTC))
-	{
-		LL_RTC_ClearFlag_WUT(RTC);
-		iFlag.IntCommand |= Parameter::WutFlagVal;
-	}
-}
-
-void TIM3_TIM4_IRQHandler(void)
-{
-	using namespace RotaryEncoder;
 }
 
 void NMI_Handler(void)
